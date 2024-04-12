@@ -53,7 +53,7 @@ async function* invokeStream(
     Body: JSON.stringify({
       inputs: inputs,
       parameters: { ...PARAMS, ...params },
-      // stream: true,
+      stream: true,
     }),
     ContentType: 'application/json',
     Accept: 'application/json',
@@ -80,23 +80,22 @@ async function* invokeStream(
   // to make sure truncations are concatinated.
 
   let buffer = '';
-  for await (const chunk of stream) {
-    buffer += new TextDecoder().decode(chunk.PayloadPart?.Bytes);
-    if (!buffer.endsWith('\n')) continue;
+  const eos_token = "</s>"
+    for await (const chunk of stream) {
+      buffer += new TextDecoder().decode(chunk.PayloadPart?.Bytes);
+      if (!buffer.endsWith('\n')) continue;
 
-    // When buffer end with \n it can be parsed
-    const lines: string[] =
-      buffer.split('\n').filter(
-        (line: string) => line.trim() //.startsWith('data:')
-      ) || [];
-    for (const line of lines) {
-      // const message = line.replace(/^data:/, '');
-      // const token: string = JSON.parse(message).token?.text || '';
-      const token: string = JSON.parse(line).outputs[0] || '';
-      // if (!token.includes(pt.eos_token))
-      yield token;
-    }
-    buffer = '';
+      // When buffer end with \n it can be parsed
+      const lines: string[] =
+        buffer
+          .split('\n')
+          .filter((line: string) => line.trim().startsWith('data:')) || [];
+      for (const line of lines) {
+        const message = line.replace(/^data:/, '');
+        const token: string = JSON.parse(message).token.text || '';
+        if (!token.includes(eos_token)) yield token;
+      }
+      buffer = '';
   }
 }
 
